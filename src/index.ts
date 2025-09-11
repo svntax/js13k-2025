@@ -1,4 +1,6 @@
 import * as pc from 'playcanvas';
+import { VRButton } from './vr-button';
+import { createText } from './create-text';
 
 // @config WEBGPU_DISABLED
 const canvas = document.getElementById('application') as HTMLCanvasElement;
@@ -17,11 +19,16 @@ const message = function (msg) {
     }
     el.textContent = msg;
 };
+
 const app = new pc.Application(canvas, {
     mouse: new pc.Mouse(canvas),
     touch: new pc.TouchDevice(canvas),
     keyboard: new pc.Keyboard(window)
 });
+
+app.elementInput = new pc.ElementInput(canvas);
+
+// Set the canvas to fill the window and automatically change resolution to be the same as the canvas size
 app.setCanvasFillMode(pc.FILLMODE_FILL_WINDOW);
 app.setCanvasResolution(pc.RESOLUTION_AUTO);
 
@@ -102,6 +109,39 @@ for (let x = 0; x <= SIZE; x++) {
     }
 }
 
+// Create title screen
+const screen = new pc.Entity("TitleScreen");
+screen.setLocalScale(0.01, 0.01, 0.01);
+screen.setPosition(0, 0, -2.5);
+//screen.setLocalRotation(new Quat().setFromEulerAngles(-90, 0, 0));
+screen.addComponent('screen', {
+    referenceResolution: new pc.Vec2(1280, 720),
+    screenSpace: false
+});
+app.root.addChild(screen);
+
+// Title text
+const titleEntity = createText(app, "Game Title", 0, 48, 200, 100, new pc.Color(), 36);
+screen.addChild(titleEntity);
+
+// Start game button
+const startButton = new VRButton(app, {
+    text: "Start",
+    position: new pc.Vec3(0, -24, 0),
+    width: 80,
+    height: 40,
+    fontSize: 24,
+    textColor: new pc.Color(),
+    backgroundColor: pc.Color.WHITE,
+    hoverTint: new pc.Color(0, 0.5, 1, 1),
+    pressedTint: new pc.Color(0.5, 1, 0.5, 1),
+    inactiveTint: new pc.Color(1, 1, 1, 0.5),
+    clickCallback: () => {
+        console.log("Start game");
+    }
+});
+screen.addChild(startButton.entity);
+
 if (app.xr.supported) {
     const activate = function () {
         if (app.xr.isAvailable(pc.XRTYPE_VR)) {
@@ -159,6 +199,8 @@ if (app.xr.supported) {
     const tmpVec3A = new pc.Vec3();
     const tmpVec3B = new pc.Vec3();
     const lineColor = new pc.Color(1, 1, 1);
+
+    const vec3A = new pc.Vec3();
 
     // update position and rotation for each controller
     app.on('update', (dt) => {
@@ -245,6 +287,18 @@ if (app.xr.supported) {
             } else {
                 // some controllers cannot be gripped
                 controllers[i].model.enabled = false;
+            }
+        }
+
+        // visualize input source rays
+        for (let i = 0; i < app.xr.input.inputSources.length; i++) {
+            const inputSource = app.xr.input.inputSources[i];
+
+            // draw ray
+            if (inputSource.targetRayMode === pc.XRTARGETRAY_POINTER) {
+                vec3A.copy(inputSource.getDirection()).mulScalar(10).add(inputSource.getOrigin());
+                const color = inputSource.selecting ? pc.Color.GREEN : pc.Color.WHITE;
+                app.drawLine(inputSource.getOrigin(), vec3A, color);
             }
         }
     });
