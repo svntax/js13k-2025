@@ -1,6 +1,8 @@
 import * as pc from 'playcanvas';
 import { VRButton } from './vr-button';
 import { createText } from './create-text';
+import { PointerLight } from './pointer-light';
+import { rayAABBIntersection } from './utils';
 
 // @config WEBGPU_DISABLED
 const canvas = document.getElementById('application') as HTMLCanvasElement;
@@ -64,6 +66,9 @@ l.addComponent('light', {
 l.translate(0, 10, 0);
 app.root.addChild(l);
 
+// Without ammo.js, we need to manually track all solid entities
+const solids: pc.Entity[] = [];
+
 /**
  * @param {number} x - The x coordinate.
  * @param {number} y - The y coordinate.
@@ -78,6 +83,7 @@ const createCube = function (x, y, z) {
     cube.setLocalScale(1, 1, 1);
     cube.translate(x, y, z);
     app.root.addChild(cube);
+    solids.push(cube);
 };
 
 const controllers = [];
@@ -142,6 +148,11 @@ const startButton = new VRButton(app, {
 });
 screen.addChild(startButton.entity);
 
+// Gameplay setup
+let gameState = 0; // 0 = title, 1 = gameplay
+const pointerLights: PointerLight[] = [];
+let selectHeld = 0; // 1 = trigger held, 0 = no trigger held
+
 if (app.xr.supported) {
     const activate = function () {
         if (app.xr.isAvailable(pc.XRTYPE_VR)) {
@@ -184,6 +195,7 @@ if (app.xr.supported) {
     // when new input source added
     app.xr.input.on('add', (inputSource) => {
         createController(inputSource);
+        pointerLights.push(new PointerLight(app));
     });
 
     message('Tap on screen to enter VR, use left thumbstick to move and right thumbstick to rotate');
@@ -290,6 +302,7 @@ if (app.xr.supported) {
             }
         }
 
+        let meshHit: pc.MeshInstance = null;
         // visualize input source rays
         for (let i = 0; i < app.xr.input.inputSources.length; i++) {
             const inputSource = app.xr.input.inputSources[i];
@@ -297,10 +310,54 @@ if (app.xr.supported) {
             // draw ray
             if (inputSource.targetRayMode === pc.XRTARGETRAY_POINTER) {
                 vec3A.copy(inputSource.getDirection()).mulScalar(10).add(inputSource.getOrigin());
-                const color = inputSource.selecting ? pc.Color.GREEN : pc.Color.WHITE;
+                const color = inputSource.selecting ? pc.Color.RED : pc.Color.WHITE;
                 app.drawLine(inputSource.getOrigin(), vec3A, color);
             }
+
+            // Calculate pointer light positions
+            if(i < pointerLights.length){ // Just in case number of input sources and pointer lights no longer match
+                const pointerLight = pointerLights[i];
+                // Calculate hit position for pointerLight from the input source
+                let candidateDist: number = Infinity;
+                for (let i = 0; i < solids.length; i++) {
+                    const mesh: pc.MeshInstance = solids[i].render.meshInstances[0];
+                    // check if mesh bounding box intersects with input source ray
+                    ray.set(inputSource.getOrigin(), inputSource.getDirection());
+                    if (mesh.aabb.intersectsRay(ray)) {
+                        // check distance to camera
+                        const dist = mesh.aabb.center.distance(c.getPosition());
+    
+                        // if it is closer than previous distance
+                        if (dist < candidateDist) {
+                            // set new candidate
+                            meshHit = mesh;
+                            candidateDist = dist;
+                        }
+                    }
+                }
+                if (meshHit) {
+                    const hitPos = rayAABBIntersection(ray.origin, ray.direction, meshHit.aabb);
+                    if (hitPos) {
+                        pointerLight.setPosition(hitPos);
+                    }
+                }
+            
+                // Pointer light is on while pressing trigger
+                pointerLight.setActive(inputSource.selecting && meshHit !== null);
+            }
         }
+        
+    });
+
+    const ray = new pc.Ray();
+    app.xr.input.on("selectstart", () => {
+        selectHeld = 1;
+    })
+    app.xr.input.on("selectend", () => {
+        selectHeld = 0;
+    })
+    app.xr.input.on('select', (inputSource: pc.XrInputSource) => {
+        
     });
 } else {
     message('WebXR is not supported');
