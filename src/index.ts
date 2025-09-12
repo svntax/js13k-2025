@@ -86,24 +86,35 @@ const createCube = function (x, y, z) {
     solids.push(cube);
 };
 
+// Create controller laser pointers
 const controllers = [];
-// create controller box
+const laserPointerAngleOffset = new pc.Vec3(90, 0, 0);
 const createController = function (inputSource) {
-    const entity = new pc.Entity();
-    entity.addComponent('model', {
-        type: 'box'
+    // Root entity
+    const rootEntity = new pc.Entity();
+    rootEntity.addComponent("model", {
+        type: "box"
     });
-    entity.setLocalScale(0.05, 0.05, 0.05);
-    cameraParent.addChild(entity);
+    rootEntity.model.hide();
+    controllers.push(rootEntity);
+    cameraParent.addChild(rootEntity);
     // @ts-ignore engine-tsd
-    entity.inputSource = inputSource;
-    controllers.push(entity);
+    rootEntity.inputSource = inputSource;
+
+    // Laser pointer model
+    const entity = new pc.Entity("LaserPointer");
+    entity.addComponent('model', {
+        type: 'cylinder'
+    });
+    entity.setLocalScale(0.03, 0.12, 0.03);
+    entity.setLocalRotation(new pc.Quat().setFromEulerAngles(laserPointerAngleOffset));
+    rootEntity.addChild(entity);
 
     // destroy input source related entity
     // when input source is removed
     inputSource.on('remove', () => {
-        controllers.splice(controllers.indexOf(entity), 1);
-        entity.destroy();
+        controllers.splice(controllers.indexOf(rootEntity), 1);
+        rootEntity.destroy();
     });
 };
 
@@ -198,7 +209,7 @@ if (app.xr.supported) {
         pointerLights.push(new PointerLight(app));
     });
 
-    message('Tap on screen to enter VR, use left thumbstick to move and right thumbstick to rotate');
+    message('Tap on screen to enter VR');
 
     const movementSpeed = 1.5; // 1.5 m/s
     const rotateSpeed = 45;
@@ -214,9 +225,12 @@ if (app.xr.supported) {
 
     const vec3A = new pc.Vec3();
 
+    const ray = new pc.Ray();
+
     // update position and rotation for each controller
     app.on('update', (dt) => {
-        let i, inputSource;
+        let i: number;
+        let inputSource: pc.XrInputSource;
 
         // first we update movement
         for (i = 0; i < controllers.length; i++) {
@@ -252,7 +266,7 @@ if (app.xr.supported) {
                     cameraParent.translate(tmpVec2A.x, 0, tmpVec2A.y);
                 }
 
-                // right controller - for rotation
+            // right controller - for rotation
             } else if (inputSource.handedness === pc.XRHAND_RIGHT) {
                 // get rotation from thumbsitck
                 const rotate = -inputSource.gamepad.axes[2];
@@ -292,13 +306,15 @@ if (app.xr.supported) {
 
             // render controller
             if (inputSource.grip) {
+                const pos = inputSource.getLocalPosition();
                 // some controllers can be gripped
                 controllers[i].model.enabled = true;
-                controllers[i].setLocalPosition(inputSource.getLocalPosition);
-                controllers[i].setLocalRotation(inputSource.getLocalRotation);
-            } else {
-                // some controllers cannot be gripped
-                controllers[i].model.enabled = false;
+                controllers[i].setLocalPosition(pos);
+
+                // Calculate the rotation to align with the VR controller ray
+                const p1 = controllers[i].getPosition();
+                const p2 = p1.clone().add(inputSource.getDirection().normalize());
+                controllers[i].lookAt(p2, controllers[i].up);
             }
         }
 
@@ -346,17 +362,6 @@ if (app.xr.supported) {
                 pointerLight.setActive(inputSource.selecting && meshHit !== null);
             }
         }
-        
-    });
-
-    const ray = new pc.Ray();
-    app.xr.input.on("selectstart", () => {
-        selectHeld = 1;
-    })
-    app.xr.input.on("selectend", () => {
-        selectHeld = 0;
-    })
-    app.xr.input.on('select', (inputSource: pc.XrInputSource) => {
         
     });
 } else {
