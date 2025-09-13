@@ -324,7 +324,6 @@ const activate = function () {
             pointerLight.setActive(true);
 
             // Calculate hit position for pointerLight from the input source
-            let candidateDist: number = Infinity;
             const ray = new pc.Ray(cameraEntity.getPosition(), pos.sub(cameraEntity.getPosition()));
             const raycastResult: CustomRaycastResult = raycast(ray, cameraEntity, solids);
             
@@ -482,6 +481,7 @@ if (app.xr.supported) {
         }
 
         let meshHit: pc.MeshInstance = null;
+        
         // visualize input source rays
         for (let i = 0; i < app.xr.input.inputSources.length; i++) {
             const inputSource = app.xr.input.inputSources[i];
@@ -499,20 +499,9 @@ if (app.xr.supported) {
                 // Calculate hit position for pointerLight from the input source
                 let candidateDist: number = Infinity;
                 ray.set(inputSource.getOrigin(), inputSource.getDirection());
-                for (let i = 0; i < solids.length; i++) {
-                    const mesh: pc.MeshInstance = solids[i].render.meshInstances[0];
-                    // check if mesh bounding box intersects with input source ray
-                    if (mesh.aabb.intersectsRay(ray)) {
-                        // check distance to camera
-                        const dist = mesh.aabb.center.distance(c.getPosition());
-    
-                        // if it is closer than previous distance
-                        if (dist < candidateDist) {
-                            // set new candidate
-                            meshHit = mesh;
-                            candidateDist = dist;
-                        }
-                    }
+                const raycastResult: CustomRaycastResult = raycast(ray, cameraParent, solids);
+                if (raycastResult.meshHit) {
+                    meshHit = raycastResult.meshHit;
                 }
                 if (meshHit) {
                     const hitPos = rayAABBIntersection(ray.origin, ray.direction, meshHit.aabb);
