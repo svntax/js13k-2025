@@ -2,7 +2,8 @@ import * as pc from 'playcanvas';
 import { VRButton } from './vr-button';
 import { createText } from './create-text';
 import { PointerLight } from './pointer-light';
-import { rayAABBIntersection } from './utils';
+import { createTexture, CustomRaycastResult, rayAABBIntersection, raycast } from './utils';
+import { Cat } from './cat';
 
 // @config WEBGPU_DISABLED
 const canvas = document.getElementById('application') as HTMLCanvasElement;
@@ -58,13 +59,19 @@ c.addComponent('camera', {
 });
 cameraParent.addChild(c);
 
+// Lighting
 const l = new pc.Entity();
 l.addComponent('light', {
-    type: 'spot',
-    range: 30
+    type: 'directional',
 });
-l.translate(0, 10, 0);
+l.rotate(-45, 135, 0);
 app.root.addChild(l);
+app.scene.ambientLight = pc.Color.GRAY;
+
+// Procedural skybox
+const skyColor = new pc.Color(0.337, 0.58, 0.867);
+const skyTexture = createTexture(app, 4, skyColor, skyColor);
+app.scene.skybox = skyTexture;
 
 // Without ammo.js, we need to manually track all solid entities
 const solids: pc.Entity[] = [];
@@ -154,7 +161,14 @@ const startButton = new VRButton(app, {
     pressedTint: new pc.Color(0.5, 1, 0.5, 1),
     inactiveTint: new pc.Color(1, 1, 1, 0.5),
     clickCallback: () => {
-        console.log("Start game");
+        if (gameState === 0) {
+            gameState = 1;
+            setTimeout(() => {
+                titleEntity.enabled = false;
+                startButton.entity.enabled = false;
+                app.fire("cat:changeState", "IDLE");
+            }, 800);
+        }
     }
 });
 screen.addChild(startButton.entity);
@@ -162,24 +176,172 @@ screen.addChild(startButton.entity);
 // Gameplay setup
 let gameState = 0; // 0 = title, 1 = gameplay
 const pointerLights: PointerLight[] = [];
-let selectHeld = 0; // 1 = trigger held, 0 = no trigger held
+//let selectHeld = 0; // 1 = trigger held, 0 = no trigger held
 
-if (app.xr.supported) {
-    const activate = function () {
-        if (app.xr.isAvailable(pc.XRTYPE_VR)) {
-            c.camera.startXr(pc.XRTYPE_VR, pc.XRSPACE_LOCAL, {
-                callback: function (err) {
-                    if (err) message(`Immersive VR failed to start: ${err.message}`);
-                }
-            });
-        } else {
-            message('Immersive VR is not available');
+// Cat model
+const MODEL_BOX = "box";
+const catEntity = new pc.Entity();
+catEntity.addComponent("script");
+catEntity.translate(0, 0.168, 0);
+catEntity.script.create(Cat);
+
+const catBody = new pc.Entity("Body");
+catBody.addComponent("model", {type: MODEL_BOX});
+catBody.setLocalScale(0.2, 0.18, 0.4);
+catEntity.addChild(catBody);
+
+const leg = new pc.Entity("Leg");
+leg.addComponent("model", {type: MODEL_BOX});
+leg.setLocalScale(0.27, 0.5, 0.11);
+leg.setLocalPosition(0.3, -0.7, 0.4);
+catBody.addChild(leg);
+const leg2 = leg.clone();
+leg2.setLocalPosition(0.3, -0.7, -0.4);
+catBody.addChild(leg2);
+const leg3 = leg.clone();
+leg3.setLocalPosition(-0.3, -0.7, 0.4);
+catBody.addChild(leg3);
+const leg4 = leg.clone();
+leg4.setLocalPosition(-0.3, -0.7, -0.4);
+catBody.addChild(leg4);
+
+const catHead = new pc.Entity();
+catHead.addComponent("model", {type: MODEL_BOX});
+catHead.setLocalScale(0.16, 0.15, 0.17);
+catHead.setLocalPosition(0, 0.05, -0.28);
+catEntity.addChild(catHead);
+
+const ear = new pc.Entity("Ear");
+ear.addComponent("model", {type: "cone"});
+ear.setLocalScale(0.3, 0.45, 0.3);
+ear.setLocalPosition(0.4, 0.65, 0.3);
+catHead.addChild(ear);
+const ear2 = ear.clone();
+ear2.setLocalPosition(-0.4, 0.65, 0.3);
+catHead.addChild(ear2);
+ear.setLocalEulerAngles(0, 0, -20);
+ear2.setLocalEulerAngles(0, 0, 20);
+
+const tailRoot = new pc.Entity("TailRoot");
+tailRoot.setLocalPosition(0, 0.04, 0.192);
+catEntity.addChild(tailRoot);
+const tail = new pc.Entity("Tail");
+tail.addComponent("model", {type: MODEL_BOX});
+tail.setLocalScale(0.04, 0.04, 0.3);
+tail.setLocalPosition(0, 0.014, 0.13);
+tailRoot.addChild(tail);
+
+const catMaterial = new pc.StandardMaterial();
+catMaterial.diffuse = new pc.Color(0.1, 0.1, 0.1);
+// Loop 2 layers deep to apply material
+catEntity.children.forEach((obj) => {
+    if(obj instanceof pc.Entity) {
+        if (obj.model) {
+            obj.model.material = catMaterial;
         }
-    };
+        obj.children.forEach((obj2) => {
+            if (obj2 instanceof pc.Entity) {
+                if (obj2.model) {
+                    obj2.model.material = catMaterial;
+                }
+            }
+        })
+    }
+});
 
-    app.mouse.on('mousedown', () => {
-        if (!app.xr.active) activate();
-    });
+const catRoot = new pc.Entity();
+catRoot.setLocalPosition(0, -1, 0);
+catRoot.rotate(0, 180, 0);
+catRoot.addChild(catEntity);
+app.root.addChild(catRoot);
+
+let debugControls = false;
+const activate = function () {
+    if (app.xr.isAvailable(pc.XRTYPE_VR)) {
+        c.camera.startXr(pc.XRTYPE_VR, pc.XRSPACE_LOCAL, {
+            callback: function (err) {
+                if (err) message(`Immersive VR failed to start: ${err.message}`);
+            }
+        });
+    } else {
+        message('Immersive VR is not available');
+        // DEBUG (disable in final build): controls without VR for testing purposes
+        if (debugControls) return;
+        debugControls = true;
+        
+        app.on("update", (dt) => {
+            const keyboard = app.keyboard;
+
+            const moveSpeed = 3;
+
+            // WASD movement
+            const forward = cameraParent.forward;
+            const right = cameraParent.right;
+
+            const velocity = new pc.Vec3();
+            if (keyboard.isPressed(pc.KEY_W)) {
+                velocity.add(forward.clone().mulScalar(moveSpeed * dt));
+            }
+            if (keyboard.isPressed(pc.KEY_S)) {
+                velocity.add(forward.clone().mulScalar(-moveSpeed * dt));
+            }
+            if (keyboard.isPressed(pc.KEY_A)) {
+                velocity.add(right.clone().mulScalar(-moveSpeed * dt));
+            }
+            if (keyboard.isPressed(pc.KEY_D)) {
+                velocity.add(right.clone().mulScalar(moveSpeed * dt));
+            }
+            cameraParent.translate(velocity);
+
+            // Turn with left/right
+            if (keyboard.isPressed(pc.KEY_LEFT) || keyboard.isPressed(pc.KEY_RIGHT)) {
+                let turnDir = 0;
+                if (keyboard.isPressed(pc.KEY_LEFT)){
+                    turnDir = 1;
+                } else if (keyboard.isPressed(pc.KEY_RIGHT)) {
+                    turnDir = -1;
+                }
+                cameraParent.rotateLocal(0, turnDir * 0.5, 0);
+            }
+        });
+
+        // Debug place target object
+        app.mouse.on("mousedown", (event: pc.MouseEvent) => {
+            let pos = new pc.Vec3();
+            const depth = 10;
+            const cameraEntity = cameraParent;
+            c.camera.screenToWorld(event.x, event.y, depth, pos);
+            // Calculate pointer light positions
+            let pointerLight: PointerLight;
+            if (pointerLights.length === 0){
+                pointerLight = new PointerLight(app);
+                pointerLights.push(pointerLight);
+                app.fire("cat:setPotentialTargets", pointerLights.map((pl) => pl.entity));
+            }
+            else {
+                pointerLight = pointerLights[0];
+            }
+            pointerLight.setActive(true);
+
+            // Calculate hit position for pointerLight from the input source
+            let candidateDist: number = Infinity;
+            const ray = new pc.Ray(cameraEntity.getPosition(), pos.sub(cameraEntity.getPosition()));
+            const raycastResult: CustomRaycastResult = raycast(ray, cameraEntity, solids);
+            
+            if (raycastResult.meshHit) {
+                const hitPos = rayAABBIntersection(ray.origin, ray.direction, raycastResult.meshHit.aabb);
+                if (hitPos) {
+                    pointerLight.setPosition(hitPos);
+                    app.fire("cat:findNewTarget");
+                }
+            }
+        });
+    }
+};
+app.mouse.on('mousedown', () => {
+    if (!app.xr.active) activate();
+});
+if (app.xr.supported) {
 
     if (app.touch) {
         app.touch.on('touchend', (evt) => {
@@ -207,6 +369,7 @@ if (app.xr.supported) {
     app.xr.input.on('add', (inputSource) => {
         createController(inputSource);
         pointerLights.push(new PointerLight(app));
+        app.fire("cat:setPotentialTargets", pointerLights.map((pl) => pl.entity));
     });
 
     message('Tap on screen to enter VR');
@@ -335,10 +498,10 @@ if (app.xr.supported) {
                 const pointerLight = pointerLights[i];
                 // Calculate hit position for pointerLight from the input source
                 let candidateDist: number = Infinity;
+                ray.set(inputSource.getOrigin(), inputSource.getDirection());
                 for (let i = 0; i < solids.length; i++) {
                     const mesh: pc.MeshInstance = solids[i].render.meshInstances[0];
                     // check if mesh bounding box intersects with input source ray
-                    ray.set(inputSource.getOrigin(), inputSource.getDirection());
                     if (mesh.aabb.intersectsRay(ray)) {
                         // check distance to camera
                         const dist = mesh.aabb.center.distance(c.getPosition());
@@ -355,6 +518,7 @@ if (app.xr.supported) {
                     const hitPos = rayAABBIntersection(ray.origin, ray.direction, meshHit.aabb);
                     if (hitPos) {
                         pointerLight.setPosition(hitPos);
+                        app.fire("cat:findNewTarget");
                     }
                 }
             

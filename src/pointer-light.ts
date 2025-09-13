@@ -1,7 +1,7 @@
 import * as pc from "playcanvas";
 
 export class PointerLight {
-    private entity: pc.Entity;
+    public entity: pc.Entity;
     private lightComponent: pc.LightComponent;
     private sphereEntity: pc.Entity;
     private isActive: boolean = false;
@@ -12,9 +12,9 @@ export class PointerLight {
         // Light component
         this.entity.addComponent("light", {
             type: "omni",
-            color: new pc.Color(1, 0.5, 0.5), // Light red color
+            color: new pc.Color(1, 0, 0),
             intensity: 20,
-            range: 1,
+            range: 0.25,
             castShadows: false,
             falloffMode: pc.LIGHTFALLOFF_INVERSESQUARED
         });
