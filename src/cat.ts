@@ -343,6 +343,12 @@ export class Cat extends pc.Script {
         }
         
         this.entity.setPosition(pos);
+
+        // Limit to map bounds
+        const newPos = this.entity.getPosition();
+        newPos.x = pc.math.clamp(newPos.x, -4, 4);
+        newPos.z = pc.math.clamp(newPos.z, -4, 4);
+        this.entity.setPosition(newPos);
     }
 
     private findNewTarget() {

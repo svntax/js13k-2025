@@ -4,6 +4,7 @@ import { createText } from './create-text';
 import { PointerLight } from './pointer-light';
 import { createTexture, CustomRaycastResult, rayAABBIntersection, raycast } from './utils';
 import { Cat } from './cat';
+import floorImageFile from "../assets/floor.png";
 
 // @config WEBGPU_DISABLED
 const canvas = document.getElementById('application') as HTMLCanvasElement;
@@ -81,16 +82,18 @@ const solids: pc.Entity[] = [];
  * @param {number} y - The y coordinate.
  * @param {number} z - The z coordinate.
  */
-const createCube = function (x, y, z) {
+const createBox = function (x: number, y: number, z: number, w: number, h: number, l: number): pc.Entity {
     const cube = new pc.Entity();
     cube.addComponent('render', {
         type: 'box',
         material: new pc.StandardMaterial()
     });
-    cube.setLocalScale(1, 1, 1);
+    cube.setLocalScale(w, h, l);
     cube.translate(x, y, z);
     app.root.addChild(cube);
     solids.push(cube);
+
+    return cube;
 };
 
 // Create controller laser pointers
@@ -125,13 +128,31 @@ const createController = function (inputSource) {
     });
 };
 
-// create a grid of cubes
-const SIZE = 4;
-for (let x = 0; x <= SIZE; x++) {
-    for (let y = 0; y <= SIZE; y++) {
-        createCube(2 * x - SIZE, -1.5, 2 * y - SIZE);
-    }
-}
+// Floor
+const FLOOR_WIDTH = 8;
+const FLOOR_LENGTH = 8;
+const floorImage = new Image();
+floorImage.src = floorImageFile;
+floorImage.onload = () => {
+    const floor = createBox(0, -1.5, 0, FLOOR_WIDTH, 1, FLOOR_LENGTH);
+    floor.name = "Floor";
+    const floorMaterial = floor.render.material as pc.StandardMaterial;
+    //const floorTexture = new pc.Asset("color", "texture", { url: floorImage }, { encoding: "srgb"});
+    const floorTexture = new pc.Texture(app.graphicsDevice, {
+        width: floorImage.width,
+        height: floorImage.height,
+        format: pc.PIXELFORMAT_R8_G8_B8_A8,
+        magFilter: pc.FILTER_LINEAR,
+        minFilter: pc.FILTER_LINEAR
+    });
+    floorTexture.setSource(floorImage);
+    floorTexture.minFilter = pc.FILTER_NEAREST;
+    floorTexture.magFilter = pc.FILTER_NEAREST;
+    
+    floorMaterial.diffuse = new pc.Color(0.3, 0.81, 0.43);
+    floorMaterial.diffuseMap = floorTexture;
+    floorMaterial.diffuseMapTiling = new pc.Vec2(8, 8);
+};
 
 // Create title screen
 const screen = new pc.Entity("TitleScreen");
@@ -293,6 +314,12 @@ const activate = function () {
             }
             cameraParent.translate(velocity);
 
+            // Limit to map bounds
+            const newPos = cameraParent.getPosition();
+            newPos.x = pc.math.clamp(newPos.x, -FLOOR_WIDTH/2, FLOOR_WIDTH/2);
+            newPos.z = pc.math.clamp(newPos.z, -FLOOR_LENGTH/2, FLOOR_LENGTH/2);
+            cameraParent.setPosition(newPos);
+
             // Turn with left/right
             if (keyboard.isPressed(pc.KEY_LEFT) || keyboard.isPressed(pc.KEY_RIGHT)) {
                 let turnDir = 0;
@@ -426,6 +453,12 @@ if (app.xr.supported) {
                     tmpVec2A.mulScalar(movementSpeed * dt);
                     // move camera parent based on calculated movement vector
                     cameraParent.translate(tmpVec2A.x, 0, tmpVec2A.y);
+
+                    // Limit to map bounds
+                    const newPos = cameraParent.getPosition();
+                    newPos.x = pc.math.clamp(newPos.x, -FLOOR_WIDTH/2, FLOOR_WIDTH/2);
+                    newPos.z = pc.math.clamp(newPos.z, -FLOOR_LENGTH/2, FLOOR_LENGTH/2);
+                    cameraParent.setPosition(newPos);
                 }
 
             // right controller - for rotation
