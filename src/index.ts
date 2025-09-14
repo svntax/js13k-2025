@@ -7,6 +7,7 @@ import { Cat } from './cat';
 import floorImageFile from "../assets/floor.png";
 import fencePostModel from "../assets/fence_post.glb";
 import { FencePost } from './fencepost';
+import { generateClouds } from './clouds';
 
 // @config WEBGPU_DISABLED
 const canvas = document.getElementById('application') as HTMLCanvasElement;
@@ -75,6 +76,15 @@ app.scene.ambientLight = pc.Color.GRAY;
 const skyColor = new pc.Color(0.337, 0.58, 0.867);
 const skyTexture = createTexture(app, 4, skyColor, skyColor);
 app.scene.skybox = skyTexture;
+
+// Clouds
+for(let x = -10; x < 10; x++){
+    for(let y = -10; y < 10; y++){
+        if(Math.random() < 0.04){
+            generateClouds(app, 5, new pc.Vec3(x*3 + pc.math.random(-3,3), 5, y*3 + pc.math.random(-3,3)));
+        }
+    }
+}
 
 // Without ammo.js, we need to manually track all solid entities
 const solids: pc.Entity[] = [];
@@ -166,7 +176,7 @@ screen.addComponent('screen', {
 app.root.addChild(screen);
 
 // Title text
-const titleEntity = createText(app, "Game Title", 0, 48, 200, 100, new pc.Color(), 36);
+const titleEntity = createText(app, "Laser Pointer Cat", 0, 48, 200, 100, new pc.Color(), 36);
 screen.addChild(titleEntity);
 
 // Start game button
