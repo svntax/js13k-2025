@@ -116,7 +116,7 @@ const createController = function (inputSource) {
     // Laser pointer model
     const entity = new pc.Entity("LaserPointer");
     entity.addComponent('model', {
-        type: 'cylinder'
+        type: MODEL_CYLINDER
     });
     entity.setLocalScale(0.03, 0.12, 0.03);
     entity.setLocalRotation(new pc.Quat().setFromEulerAngles(laserPointerAngleOffset));
@@ -283,10 +283,11 @@ app.assets.load(fenceAsset);
 
 // Cat model
 const MODEL_BOX = "box";
+const MODEL_CYLINDER = "cylinder";
 const catEntity = new pc.Entity();
 catEntity.addComponent("script");
 catEntity.translate(0, 0.168, 0);
-catEntity.rotate(0, 45, 0);
+//catEntity.rotate(0, 45, 0);
 catEntity.script.create(Cat);
 
 const catBody = new pc.Entity("Body");
@@ -326,6 +327,25 @@ catHead.addChild(ear2);
 ear.setLocalEulerAngles(0, 0, -20);
 ear2.setLocalEulerAngles(0, 0, 20);
 
+const whisker = new pc.Entity();
+whisker.addComponent("model", {type: MODEL_BOX});
+whisker.setLocalScale(0.8, 0.05, 0.05);
+whisker.setLocalPosition(0.45, -0.057, -0.536);
+whisker.setLocalEulerAngles(0, 0, 8);
+catHead.addChild(whisker);
+const whisker2 = whisker.clone();
+whisker2.setLocalEulerAngles(0, 0, -8);
+whisker2.setLocalPosition(-0.45, -0.057, -0.536);
+catHead.addChild(whisker2);
+const whisker3 = whisker.clone();
+whisker3.setLocalEulerAngles(0, 0, -10);
+whisker3.setLocalPosition(0.45, -0.212, -0.536);
+catHead.addChild(whisker3);
+const whisker4 = whisker.clone();
+whisker4.setLocalEulerAngles(0, 0, 10);
+whisker4.setLocalPosition(-0.45, -0.212, -0.536);
+catHead.addChild(whisker4);
+
 const tailRoot = new pc.Entity("TailRoot");
 tailRoot.setLocalPosition(0, 0.04, 0.192);
 catEntity.addChild(tailRoot);
@@ -352,6 +372,42 @@ catEntity.children.forEach((obj) => {
         })
     }
 });
+
+const bandana = new pc.Entity("Bandana");
+bandana.addComponent("model", {type: MODEL_BOX});
+bandana.setLocalScale(1.1, 0.5, 1.1);
+bandana.setLocalPosition(0, 0.162, 0);
+const bandanaMaterial = new pc.StandardMaterial();
+bandanaMaterial.diffuse = new pc.Color(0.729, 0.031, 0.031)
+bandana.model.material = bandanaMaterial;
+catHead.addChild(bandana);
+
+const eye = new pc.Entity();
+eye.addComponent("model", {type: MODEL_CYLINDER});
+eye.setLocalScale(0.33, 0.13, 0.33);
+eye.setLocalPosition(0.26, 0.144, -0.51);
+eye.setLocalEulerAngles(90, 0, 0);
+catHead.addChild(eye);
+const eye2 = eye.clone();
+eye2.setLocalPosition(-0.26, 0.144, -0.51);
+catHead.addChild(eye2);
+
+const pupilMaterial = new pc.StandardMaterial();
+pupilMaterial.diffuse = pc.Color.BLACK;
+const pupil = new pc.Entity();
+pupil.addComponent("model", {type: MODEL_CYLINDER});
+pupil.setLocalScale(0.5, 1, 1);
+pupil.setLocalPosition(0, -0.1, 0);
+pupil.model.material = pupilMaterial;
+eye.addChild(pupil);
+const pupil2 = pupil.clone();
+eye2.addChild(pupil2);
+
+const nose = new pc.Entity();
+nose.addComponent("model", {type: "sphere"});
+nose.setLocalScale(0.15, 0.15, 0.15);
+nose.setLocalPosition(0, -0.11, -0.56);
+catHead.addChild(nose);
 
 const catRoot = new pc.Entity();
 catRoot.setLocalPosition(0, -1, 0);
