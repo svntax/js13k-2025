@@ -21,6 +21,7 @@ module.exports = merge(common, {
   },
   output: {
     path: path.join(process.cwd(), "dist"),
+    publicPath: "" // Set to empty string to make path relative to the HTML page
   },
   plugins: [
     new BundleAnalyzerPlugin({ openAnalyzer: false, analyzerMode: "static" }),

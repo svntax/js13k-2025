@@ -21,6 +21,10 @@ module.exports = {
 			{
 				test: /\.glsl$/i,
 				use: "raw-loader"
+			},
+			{
+				test: /\.(glb|gltf|fbx|obj)$/i,
+				type: "asset/resource"
 			}
 		]
 	}

@@ -9,6 +9,11 @@ const output = fs.createWriteStream(zippedDir + "/game.zip");
 const archive = archiver("zip", { zlib: { level: 9 } });
 
 archive.pipe(output);
-archive.file(distDir + "/index.html", { name: "index.html" });
+// Include all files except main.js and report.html
+archive.glob("**/*", {
+  cwd: distDir,
+  ignore: ["main.js", "report.html"],
+  nodir: true,
+});
 
 archive.finalize();

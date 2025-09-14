@@ -5,6 +5,8 @@ import { PointerLight } from './pointer-light';
 import { createTexture, CustomRaycastResult, rayAABBIntersection, raycast } from './utils';
 import { Cat } from './cat';
 import floorImageFile from "../assets/floor.png";
+import fencePostModel from "../assets/fence_post.glb";
+import { FencePost } from './fencepost';
 
 // @config WEBGPU_DISABLED
 const canvas = document.getElementById('application') as HTMLCanvasElement;
@@ -55,7 +57,7 @@ app.root.addChild(cameraParent);
 // create camera
 const c = new pc.Entity();
 c.addComponent('camera', {
-    clearColor: new pc.Color(44 / 255, 62 / 255, 80 / 255),
+    clearColor: new pc.Color(0.173, 0.243, 0.314),
     farClip: 10000
 });
 cameraParent.addChild(c);
@@ -134,10 +136,9 @@ const FLOOR_LENGTH = 8;
 const floorImage = new Image();
 floorImage.src = floorImageFile;
 floorImage.onload = () => {
-    const floor = createBox(0, -1.5, 0, FLOOR_WIDTH, 1, FLOOR_LENGTH);
+    const floor = createBox(0, -1.5, 0, FLOOR_WIDTH + 1, 1, FLOOR_LENGTH + 1);
     floor.name = "Floor";
     const floorMaterial = floor.render.material as pc.StandardMaterial;
-    //const floorTexture = new pc.Asset("color", "texture", { url: floorImage }, { encoding: "srgb"});
     const floorTexture = new pc.Texture(app.graphicsDevice, {
         width: floorImage.width,
         height: floorImage.height,
@@ -158,7 +159,6 @@ floorImage.onload = () => {
 const screen = new pc.Entity("TitleScreen");
 screen.setLocalScale(0.01, 0.01, 0.01);
 screen.setPosition(0, 0, -2.5);
-//screen.setLocalRotation(new Quat().setFromEulerAngles(-90, 0, 0));
 screen.addComponent('screen', {
     referenceResolution: new pc.Vec2(1280, 720),
     screenSpace: false
@@ -199,11 +199,94 @@ let gameState = 0; // 0 = title, 1 = gameplay
 const pointerLights: PointerLight[] = [];
 //let selectHeld = 0; // 1 = trigger held, 0 = no trigger held
 
+// Create fence posts around perimeter
+const fencePostModelFileData = {
+    url: fencePostModel,
+    filename: fencePostModel
+};
+const fenceAsset = new pc.Asset(fencePostModel, 'container', fencePostModelFileData, null, null);
+fenceAsset.once('load', function (containerAsset: pc.Asset) {
+    const initialPos = new pc.Vec3(0, -1, 0);
+    const rot = new pc.Vec3();
+    const scale = new pc.Vec3(1, 1, 1);
+    const fence = new FencePost(initialPos, rot, scale, containerAsset.resource as pc.ContainerResource);
+    
+    const postWidth = 0.232;
+    const postDepth = 0.276;
+    const halfLength = 4.25;
+    const gapBetweenPosts = 0.3;
+    
+    // For the longer sides (where posts are placed along z-axis)
+    const availableLengthZ = 2 * halfLength - postWidth; // Subtract one post width
+    const idealCountZ = Math.floor(availableLengthZ / (postDepth + gapBetweenPosts));
+    const actualGapZ = (availableLengthZ - idealCountZ * postDepth) / idealCountZ;
+    
+    // For the shorter sides (where posts are placed along x-axis)
+    const availableLengthX = 2 * halfLength - postDepth; // Subtract one post depth
+    const idealCountX = Math.floor(availableLengthX / (postWidth + gapBetweenPosts));
+    const actualGapX = (availableLengthX - idealCountX * postWidth) / idealCountX;
+    
+    // North side
+    let posNum = -halfLength + postWidth/2; // Start position (left side)
+    for (let i = 0; i < idealCountX + 1; i++) {
+        const pos = new pc.Vec3(posNum, -1, -halfLength);
+        const rot = new pc.Vec3(0, -90, 0);
+        const clone = fence.entity.clone();
+        clone.setPosition(pos);
+        clone.setEulerAngles(rot);
+        app.root.addChild(clone);
+        solids.push(clone);
+        posNum += postWidth + actualGapX;
+    }
+    
+    // East side
+    let posEast = -halfLength + postWidth/2; // Start position (top side)
+    for (let i = 0; i < idealCountZ + 1; i++) {
+        const pos = new pc.Vec3(halfLength, -1, posEast);
+        const rot = new pc.Vec3(0, 180, 0);
+        const clone = fence.entity.clone();
+        clone.setPosition(pos);
+        clone.setEulerAngles(rot);
+        app.root.addChild(clone);
+        solids.push(clone);
+        posEast += postDepth + actualGapZ;
+    }
+    
+    // South side
+    let posSouth = -halfLength + postWidth/2; // Start position (left side)
+    for (let i = 0; i < idealCountX + 1; i++) {
+        const pos = new pc.Vec3(posSouth, -1, halfLength);
+        const rot = new pc.Vec3(0, 90, 0);
+        const clone = fence.entity.clone();
+        clone.setPosition(pos);
+        clone.setEulerAngles(rot);
+        app.root.addChild(clone);
+        solids.push(clone);
+        posSouth += postWidth + actualGapX;
+    }
+    
+    // West side
+    let posWest = -halfLength + postWidth/2; // Start position (top side)
+    for (let i = 0; i < idealCountZ + 1; i++) {
+        const pos = new pc.Vec3(-halfLength, -1, posWest);
+        const rot = new pc.Vec3(0, 0, 0);
+        const clone = fence.entity.clone();
+        clone.setPosition(pos);
+        clone.setEulerAngles(rot);
+        app.root.addChild(clone);
+        solids.push(clone);
+        posWest += postDepth + actualGapZ;
+    }
+});
+app.assets.add(fenceAsset);
+app.assets.load(fenceAsset);
+
 // Cat model
 const MODEL_BOX = "box";
 const catEntity = new pc.Entity();
 catEntity.addComponent("script");
 catEntity.translate(0, 0.168, 0);
+catEntity.rotate(0, 45, 0);
 catEntity.script.create(Cat);
 
 const catBody = new pc.Entity("Body");
@@ -286,6 +369,7 @@ const activate = function () {
         });
     } else {
         message('Immersive VR is not available');
+
         // DEBUG (disable in final build): controls without VR for testing purposes
         if (debugControls) return;
         debugControls = true;
