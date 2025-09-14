@@ -1,6 +1,8 @@
-## About this fork
+# Laser Pointer Cat
 
-This fork adds support for PlayCanvas 2.10.6 for the js13kGames 2025 jam. It uses the npm package for dev, and the CDN hosted by js13k for prod. Run the project to see the [example rotating box scene](https://developer.playcanvas.com/user-manual/engine/standalone/) from PlayCanvas's documentation.
+This game is an unfinished demo made for the js13kGames 2025 jam, WebXR category, using PlayCanvas.
+
+The project base was generated from https://github.com/svntax/js13k-webpack-typescript-playcanvas-starter
 
 Below is the original README.
 
