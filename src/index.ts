@@ -143,27 +143,19 @@ const createController = function (inputSource) {
 // Floor
 const FLOOR_WIDTH = 8;
 const FLOOR_LENGTH = 8;
-const floorImage = new Image();
-floorImage.src = floorImageFile;
-floorImage.onload = () => {
-    const floor = createBox(0, -1.5, 0, FLOOR_WIDTH + 1, 1, FLOOR_LENGTH + 1);
-    floor.name = "Floor";
-    const floorMaterial = floor.render.material as pc.StandardMaterial;
-    const floorTexture = new pc.Texture(app.graphicsDevice, {
-        width: floorImage.width,
-        height: floorImage.height,
-        format: pc.PIXELFORMAT_R8_G8_B8_A8,
-        magFilter: pc.FILTER_LINEAR,
-        minFilter: pc.FILTER_LINEAR
-    });
-    floorTexture.setSource(floorImage);
+app.assets.loadFromUrl(floorImageFile, "texture", function (err: string | null, asset: pc.Asset) {
+    const floorTexture = asset.resource as pc.Texture;
     floorTexture.minFilter = pc.FILTER_NEAREST;
     floorTexture.magFilter = pc.FILTER_NEAREST;
     
+    const floor = createBox(0, -1.5, 0, FLOOR_WIDTH + 1, 1, FLOOR_LENGTH + 1);
+    floor.name = "Floor";
+    
+    const floorMaterial = floor.render.material as pc.StandardMaterial;
     floorMaterial.diffuse = new pc.Color(0.3, 0.81, 0.43);
     floorMaterial.diffuseMap = floorTexture;
     floorMaterial.diffuseMapTiling = new pc.Vec2(8, 8);
-};
+});
 
 // Create title screen
 const screen = new pc.Entity("TitleScreen");
